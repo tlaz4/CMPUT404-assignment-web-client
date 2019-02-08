@@ -41,13 +41,13 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        return data[0].split(" ")[1]
 
     def get_headers(self,data):
-        return None
+        return data.split("\r\n")[:-1]
 
     def get_body(self, data):
-        return None
+        return data.split("\r\n")[-1]
     
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
@@ -68,13 +68,46 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        host, port, path = self.parseUrl(url)
+        getRequest = "GET {} HTTP/1.1\r\nHost: {}\r\n\r\n".format(path, host)
+
+        print(getRequest)
+
+        self.connect(host, port)
+        self.sendall(getRequest)
+
+        response = self.recvall(self.socket)
+        header = self.get_headers(response)
+        body = self.get_body(response)
+        code = int(self.get_code(header))
+
+        self.close()
+
+        print(response)
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        host, port, path = self.parseUrl(url)
+        parsedArgs = ""
+
+        if args != None:
+            parsedArgs = self.handleArgs(args)
+
+        postRequest = ("POST {} HTTP/1.1\r\nHost: {}\r\n"
+                    "Content-Type: application/x-www-form-urlencoded\r\n"
+                    "Content-Length: {}\r\n\r\n{}").format(path, host, str(len(parsedArgs)), parsedArgs)
+
+        self.connect(host, port)
+        self.sendall(postRequest)
+
+        response = self.recvall(self.socket)
+        header = self.get_headers(response)
+        body = self.get_body(response)
+        code = int(self.get_code(header))
+
+        self.close()
+
+        print(response)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -82,6 +115,41 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
+        
+        code = parsed[0].split(" ")[1]
+        body = parsed[-1]
+
+        return code, body
+
+    # parse url, getting host, port, path
+    def parseUrl(self, url):
+        urlObj = urllib.parse.urlparse(url)
+
+        # if no port specified, assume port 80 as per http protocol
+        if ":" in urlObj.netloc:
+            hostport = urlObj.netloc.split(":")
+            host, port = hostport[0], int(hostport[1])
+        else:
+            host,port = urlObj.netloc, 80
+
+        path = urlObj.path
+
+        if path == "":
+            path ="/"
+
+        return host, port, path
+
+    # handle arguments passed in post
+    # create string and standardize it
+    def handleArgs(self, args):
+        parsedArgs = ""
+
+        for key, val in args.items():
+            parsedArgs += key + "=" + val + "&"
+
+        parsedArgs.replace(" ", "+")
+        return parsedArgs[:-1]
+
     
 if __name__ == "__main__":
     client = HTTPClient()
