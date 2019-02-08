@@ -69,13 +69,14 @@ class HTTPClient(object):
 
     def GET(self, url, args=None):
         host, port, path = self.parseUrl(url)
+        # our get request
         getRequest = "GET {} HTTP/1.1\r\nHost: {}\r\n\r\n".format(path, host)
 
-        print(getRequest)
-
+        # connect and send request
         self.connect(host, port)
         self.sendall(getRequest)
 
+        # parse the response and return
         response = self.recvall(self.socket)
         header = self.get_headers(response)
         body = self.get_body(response)
@@ -83,9 +84,10 @@ class HTTPClient(object):
 
         self.close()
 
-        print(response)
+        print(body)
         return HTTPResponse(code, body)
 
+    # post 
     def POST(self, url, args=None):
         host, port, path = self.parseUrl(url)
         parsedArgs = ""
@@ -93,13 +95,16 @@ class HTTPClient(object):
         if args != None:
             parsedArgs = self.handleArgs(args)
 
+        # our post request
         postRequest = ("POST {} HTTP/1.1\r\nHost: {}\r\n"
                     "Content-Type: application/x-www-form-urlencoded\r\n"
                     "Content-Length: {}\r\n\r\n{}").format(path, host, str(len(parsedArgs)), parsedArgs)
 
+        # connect and send
         self.connect(host, port)
         self.sendall(postRequest)
 
+        # get our header and bodies
         response = self.recvall(self.socket)
         header = self.get_headers(response)
         body = self.get_body(response)
@@ -107,7 +112,7 @@ class HTTPClient(object):
 
         self.close()
 
-        print(response)
+        print(body)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -115,11 +120,6 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
-        
-        code = parsed[0].split(" ")[1]
-        body = parsed[-1]
-
-        return code, body
 
     # parse url, getting host, port, path
     def parseUrl(self, url):
@@ -142,13 +142,7 @@ class HTTPClient(object):
     # handle arguments passed in post
     # create string and standardize it
     def handleArgs(self, args):
-        parsedArgs = ""
-
-        for key, val in args.items():
-            parsedArgs += key + "=" + val + "&"
-
-        parsedArgs.replace(" ", "+")
-        return parsedArgs[:-1]
+        return urllib.parse.urlencode(args)
 
     
 if __name__ == "__main__":
